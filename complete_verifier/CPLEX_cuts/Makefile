@@ -1,5 +1,5 @@
 # Change the path based on your installation folder.
-CPX_PATH = /opt/ibm/ILOG/CPLEX_Studio221/cplex/
+CPX_PATH = /home/csidrane/Software/CPLEX_Studio_Community2211/cplex
 
 CC = g++
 ARCH = x86-64_linux

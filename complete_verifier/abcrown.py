@@ -40,6 +40,7 @@ from batch_branch_and_bound_input_split import input_bab_parallel
 
 from read_vnnlib import batch_vnnlib, read_vnnlib
 from cut_utils import terminate_mip_processes, terminate_mip_processes_by_c_matching
+import ipdb
 
 
 def incomplete_verifier(model_ori, data, data_ub=None, data_lb=None, vnnlib=None):
@@ -67,9 +68,11 @@ def incomplete_verifier(model_ori, data, data_ub=None, data_lb=None, vnnlib=None
     x = BoundedTensor(data, ptb).to(data_lb.device)
     domain = torch.stack([data_lb.squeeze(0), data_ub.squeeze(0)], dim=-1)
     bound_prop_method = arguments.Config["solver"]["bound_prop_method"]
+    print(100*"___"+"\nUsing bound prop method: {}".format(bound_prop_method)+100*"___")
 
     _, global_lb, _, _, _, mask, lA, lower_bounds, upper_bounds, pre_relu_indices, slope, history, attack_images = model.build_the_model(
             domain, x, data_lb, data_ub, vnnlib, stop_criterion_func=stop_criterion_min(arguments.Config["bab"]["decision_thresh"]))
+    print("length of lower bounds: {}".format(len(lower_bounds)))
 
     if (global_lb > arguments.Config["bab"]["decision_thresh"]).all():
         print("verified with init bound!")
@@ -419,6 +422,11 @@ def complete_verifier(
     else:
         return 'safe'
 
+def save_bounds(saved_bounds):
+    lirpa_model, lower_bounds, upper_bounds, mask, pre_relu_indices, lA = saved_bounds
+    ipdb.set_trace()
+    # save to numpy array
+
 
 def main():
     print(f'Experiments at {time.ctime()} on {socket.gethostname()}')
@@ -447,6 +455,7 @@ def main():
         print('Only Linf-norm attack is supported, the pgd_order will be changed to skip')
         arguments.Config["attack"]["pgd_order"] = "skip"
 
+    ipdb.set_trace()
     run_mode, save_path, file_root, example_idx_list, model_ori, vnnlib_all, shape = parse_run_mode()
     verification_summary = defaultdict(list)
     time_all_instances = []
@@ -456,6 +465,7 @@ def main():
     select_instance = arguments.Config["data"]["select_instance"]
 
     for new_idx, csv_item in enumerate(example_idx_list):
+        print("new_idx = {}".format(new_idx))
         arguments.Globals["example_idx"] = new_idx
         vnnlib_id = new_idx + arguments.Config["data"]["start"]
 
@@ -528,6 +538,8 @@ def main():
             init_global_lb = saved_bounds = saved_slopes = y = lower_bounds = upper_bounds = None
             activation_opt_params = model_incomplete = lA = cplex_processes = None
 
+            print("saved_bounds = {} ".format(saved_bounds))
+
             # Incomplete verification is enabled by default. The intermediate lower
             # and upper bounds will be reused in bab and mip.
             if (not verified_success and (
@@ -541,6 +553,9 @@ def main():
                     model_incomplete, lower_bounds, upper_bounds = saved_bounds[:3]
                     lA = saved_bounds[-1]
 
+            if arguments.Config["general"]["complete_verifier"] == "bounds_only":
+                save_bounds(saved_bounds)
+
             if not verified_success and arguments.Config["attack"]["pgd_order"] == "after":
                 verified_status, verified_success, attack_images, attack_margins, all_adv_candidates = attack(
                     model_ori, x, data_min, data_max, vnnlib,
@@ -550,6 +565,7 @@ def main():
             refined_betas = None
             if not verified_success and (arguments.Config["general"]["complete_verifier"] == "mip" or arguments.Config["general"]["complete_verifier"] == "bab-refine"):
                 # rhs = ? NEED TO SAVE TO LIRPA_MODULE
+                ipdb.set_trace() # check what saved bound are
                 verified_status, init_global_lb, lower_bounds, upper_bounds, refined_betas = mip(saved_bounds=saved_bounds)
                 verified_success = verified_status != "unknown"
 
